@@ -32,7 +32,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <param name="concurrencyDetector"> The concurrency detector. </param>
         public QueryContext(
             [NotNull] Func<IQueryBuffer> queryBufferFactory,
-            [NotNull] IStateManager stateManager,
+            [NotNull] LazyRef<IStateManager> stateManager,
             [NotNull] IConcurrencyDetector concurrencyDetector)
         {
             Check.NotNull(queryBufferFactory, nameof(queryBufferFactory));
@@ -57,7 +57,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <value>
         ///     The state manager.
         /// </value>
-        public virtual IStateManager StateManager { get; }
+        public virtual LazyRef<IStateManager> StateManager { get; }
 
         /// <summary>
         ///     Gets the concurrency detector.
@@ -114,7 +114,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <summary>
         ///     Notify the state manager that a tracking query is starting.
         /// </summary>
-        public virtual void BeginTrackingQuery() => StateManager.BeginTrackingQuery();
+        public virtual void BeginTrackingQuery() => StateManager.Value.BeginTrackingQuery();
 
         /// <summary>
         ///     Start tracking an entity.
@@ -130,7 +130,7 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
             else
             {
-                entityTrackingInfo.StartTracking(StateManager, entity, ValueBuffer.Empty);
+                entityTrackingInfo.StartTracking(StateManager.Value, entity, ValueBuffer.Empty);
             }
         }
     }

@@ -19,33 +19,20 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
     /// </summary>
     public class ChangeTracker : IInfrastructure<IStateManager>
     {
-        private readonly IStateManager _stateManager;
-        private readonly IChangeDetector _changeDetector;
-        private readonly IEntityEntryGraphIterator _graphIterator;
+        private IStateManager _stateManager;
+        private IChangeDetector _changeDetector;
+        private IEntityEntryGraphIterator _graphIterator;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="ChangeTracker" /> class. Instances of this class are typically
         ///     obtained from <see cref="DbContext.ChangeTracker" /> and it is not designed to be directly constructed
         ///     in your application code.
         /// </summary>
-        /// <param name="stateManager"> The internal state manager being used to store information about tracked entities. </param>
-        /// <param name="changeDetector"> The internal change detector used to identify changes in tracked entities. </param>
-        /// <param name="graphIterator"> The internal graph iterator used to traverse graphs of entities. </param>
         /// <param name="context"> The context this change tracker belongs to. </param>
-        public ChangeTracker(
-            [NotNull] IStateManager stateManager,
-            [NotNull] IChangeDetector changeDetector,
-            [NotNull] IEntityEntryGraphIterator graphIterator,
-            [NotNull] DbContext context)
+        public ChangeTracker([NotNull] DbContext context)
         {
-            Check.NotNull(stateManager, nameof(stateManager));
-            Check.NotNull(changeDetector, nameof(changeDetector));
-            Check.NotNull(graphIterator, nameof(graphIterator));
             Check.NotNull(context, nameof(context));
 
-            _stateManager = stateManager;
-            _changeDetector = changeDetector;
-            _graphIterator = graphIterator;
             Context = context;
         }
 
@@ -93,7 +80,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         {
             TryDetectChanges();
 
-            return _stateManager.Entries.Select(e => new EntityEntry(e));
+            return StateManager.Entries.Select(e => new EntityEntry(e));
         }
 
         /// <summary>
@@ -106,7 +93,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         {
             TryDetectChanges();
 
-            return _stateManager.Entries
+            return StateManager.Entries
                 .Where(e => e.Entity is TEntity)
                 .Select(e => new EntityEntry<TEntity>(e));
         }
@@ -128,7 +115,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         ///         application code.
         ///     </para>
         /// </summary>
-        IStateManager IInfrastructure<IStateManager>.Instance => _stateManager;
+        IStateManager IInfrastructure<IStateManager>.Instance => StateManager;
 
         /// <summary>
         ///     Gets the context this change tracker belongs to.
@@ -141,14 +128,14 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         ///     <see cref="DbContext.SaveChanges()" /> and when returning change tracking information). You typically only need to
         ///     call this method if you have disabled <see cref="AutoDetectChangesEnabled" />.
         /// </summary>
-        public virtual void DetectChanges() => _changeDetector.DetectChanges(_stateManager);
+        public virtual void DetectChanges() => ChangeDetector.DetectChanges(StateManager);
 
         /// <summary>
         ///     Accepts all changes made to entities in the context. It will be assumed that the tracked entities
         ///     represent the current state of the database. This method is typically called by <see cref="DbContext.SaveChanges()" />
         ///     after changes have been successfully saved to the database.
         /// </summary>
-        public virtual void AcceptAllChanges() => _stateManager.AcceptAllChanges();
+        public virtual void AcceptAllChanges() => StateManager.AcceptAllChanges();
 
         /// <summary>
         ///     <para>
@@ -182,9 +169,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
             Check.NotNull(rootEntity, nameof(rootEntity));
             Check.NotNull(callback, nameof(callback));
 
-            var rootEntry = _stateManager.GetOrCreateEntry(rootEntity);
+            var rootEntry = StateManager.GetOrCreateEntry(rootEntity);
 
-            _graphIterator.TraverseGraph(
+            GraphIterator.TraverseGraph(
                 new EntityEntryGraphNode(rootEntry, null),
                 n =>
                     {
@@ -198,5 +185,14 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
                         return n.Entry.State != EntityState.Detached;
                     });
         }
+
+        private IStateManager StateManager 
+            => _stateManager ?? (_stateManager = Context.GetService<IStateManager>());
+
+        private IChangeDetector ChangeDetector 
+            => _changeDetector ?? (_changeDetector = Context.GetService<IChangeDetector>());
+
+        private IEntityEntryGraphIterator GraphIterator 
+            => _graphIterator ?? (_graphIterator = Context.GetService<IEntityEntryGraphIterator>());
     }
 }

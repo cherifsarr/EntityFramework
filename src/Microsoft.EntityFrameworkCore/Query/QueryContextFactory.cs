@@ -3,6 +3,7 @@
 
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
@@ -17,22 +18,20 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <summary>
         ///     Initializes a new instance of the Microsoft.EntityFrameworkCore.Query.QueryContextFactory class.
         /// </summary>
-        /// <param name="stateManager"> The state manager. </param>
+        /// <param name="currentContext"> The context that will be used for tracking if needed. </param>
         /// <param name="concurrencyDetector"> The concurrency detector. </param>
-        /// <param name="changeDetector"> The change detector. </param>
         protected QueryContextFactory(
-            [NotNull] IStateManager stateManager,
-            [NotNull] IConcurrencyDetector concurrencyDetector,
-            [NotNull] IChangeDetector changeDetector)
+            [NotNull] ICurrentDbContext currentContext,
+            [NotNull] IConcurrencyDetector concurrencyDetector)
         {
-            Check.NotNull(stateManager, nameof(stateManager));
+            Check.NotNull(currentContext, nameof(currentContext));
             Check.NotNull(concurrencyDetector, nameof(concurrencyDetector));
-            Check.NotNull(changeDetector, nameof(changeDetector));
 
-            StateManager = stateManager;
+            StateManager = new LazyRef<IStateManager>(() => currentContext.Context.GetService<IStateManager>());
             ConcurrencyDetector = concurrencyDetector;
-            ChangeDetector = changeDetector;
+            ChangeDetector = new LazyRef<IChangeDetector>(() => currentContext.Context.GetService<IChangeDetector>()); ;
         }
+
 
         /// <summary>
         ///     Creates a query buffer.
@@ -49,7 +48,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <value>
         ///     The change detector.
         /// </value>
-        protected virtual IChangeDetector ChangeDetector { get; }
+        protected virtual LazyRef<IChangeDetector> ChangeDetector { get; }
 
         /// <summary>
         ///     Gets the state manager.
@@ -57,7 +56,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <value>
         ///     The state manager.
         /// </value>
-        protected virtual IStateManager StateManager { get; }
+        protected virtual LazyRef<IStateManager> StateManager { get; }
 
         /// <summary>
         ///     Gets the concurrency detector.
